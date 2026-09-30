@@ -15,7 +15,7 @@ void main() {
     await tester.pump();
 
     expect(find.text('Nomor HP wajib diisi'), findsOneWidget);
-    expect(find.text('Password minimal 6 karakter'), findsOneWidget);
+    expect(find.text('Password minimal 8 karakter'), findsOneWidget);
   });
 
   testWidgets('successful login opens home screen', (
