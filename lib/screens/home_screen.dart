@@ -1,94 +1,217 @@
 import 'package:flutter/material.dart';
 
+import '../data/item_repository.dart';
+import '../models/item.dart';
+import '../routes/app_routes.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/cookbox_logo.dart';
+import '../widgets/state_views.dart';
 
-class HomeScreen extends StatelessWidget {
+// (1) status tampilan
+enum ViewStatus { loading, success, error }
+
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
   static const _heroImage =
       'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=85';
+
+  // (2) variabel state
+  final _repository = ItemRepository();
+  ViewStatus _status = ViewStatus.loading;
+  List<Item> _items = [];
+  String _errorMessage = '';
+  // ignore: prefer_final_fields
+  bool _simulateError = false; // ubah ke true untuk menguji error state
+
+  // (3) ambil data saat layar pertama kali dibuka
+  @override
+  void initState() {
+    super.initState();
+    _loadItems();
+  }
+
+  // (4) mengambil data + menangani error
+  Future<void> _loadItems() async {
+    if (_status != ViewStatus.loading) {
+      setState(() => _status = ViewStatus.loading);
+    }
+    try {
+      final items = await _repository.fetchItems(simulateError: _simulateError);
+      if (!mounted) return;
+      setState(() {
+        _items = items;
+        _status = ViewStatus.success;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _status = ViewStatus.error;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final horizontalPadding = constraints.maxWidth > 600
-                ? constraints.maxWidth * 0.2
-                : AppSpacing.page;
-            return SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                horizontalPadding,
-                AppSpacing.top,
-                horizontalPadding,
-                AppSpacing.page,
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+        child: _buildContent(), // (5) isi layar tergantung status
+      ),
+    );
+  }
+
+  // (6) memilih tampilan: loading / error / empty / daftar data
+  Widget _buildContent() {
+    return switch (_status) {
+      ViewStatus.loading => const LoadingView(),
+      ViewStatus.error => ErrorView(
+          message: _errorMessage,
+          onRetry: _loadItems,
+        ),
+      ViewStatus.success => _buildList(),
+    };
+  }
+
+  Widget _buildList() {
+    if (_items.isEmpty) {
+      return const EmptyView(message: 'Belum ada data.');
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final horizontalPadding = constraints.maxWidth > 600
+            ? constraints.maxWidth * 0.2
+            : AppSpacing.page;
+        return SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            horizontalPadding,
+            AppSpacing.top,
+            horizontalPadding,
+            AppSpacing.page,
+          ),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 460),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const _HomeHeader(),
+                const SizedBox(height: AppSpacing.section),
+                const _CategoryChip(),
+                const SizedBox(height: AppSpacing.field),
+                const _TodayHero(imageUrl: _heroImage),
+                const SizedBox(height: AppSpacing.section),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const _HomeHeader(),
-                    const SizedBox(height: AppSpacing.section),
-                    const _CategoryChip(),
-                    const SizedBox(height: AppSpacing.field),
-                    const _TodayHero(imageUrl: _heroImage),
-                    const SizedBox(height: AppSpacing.section),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Keunggulan CookBox',
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        TextButton(
-                          onPressed: () {},
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: const Text('Anti Ribet'),
-                        ),
-                      ],
+                    Text(
+                      'Pilihan Paket Masak',
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
-                    const SizedBox(height: AppSpacing.small),
-                    const _AdvantageTile(
-                      icon: Icons.hourglass_bottom_rounded,
-                      iconBackground: Color(0xFFFFDAD0),
-                      iconColor: AppColors.accent,
-                      title: 'Bahan Sudah Ditakar',
-                      description:
-                          'Takaran sesuai resep dan jumlah porsi. Noli sia...',
-                    ),
-                    const SizedBox(height: AppSpacing.small),
-                    const _AdvantageTile(
-                      icon: Icons.account_balance_wallet_outlined,
-                      iconBackground: Color(0xFFC7FFD4),
-                      iconColor: Color(0xFF28B957),
-                      title: 'Praktis & Hemat',
-                      description:
-                          'Tidak perlu belanja bahan satu per satu ke pasar.',
-                    ),
-                    const SizedBox(height: AppSpacing.small),
-                    const _AdvantageTile(
-                      icon: Icons.storefront_outlined,
-                      iconBackground: Color(0xFFFFD9D1),
-                      iconColor: AppColors.accent,
-                      title: 'Dukung UMKM Lokal',
-                      description:
-                          'Pesan paket bahan secara langsung dari pedagang.',
+                    Text(
+                      '${_items.length} Paket',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: AppColors.muted),
                     ),
                   ],
                 ),
-              ),
-            );
-          },
-        ),
-      ),
+                const SizedBox(height: AppSpacing.small),
+                ..._items.map(
+                  (item) => Padding(
+                    padding: const EdgeInsets.only(bottom: AppSpacing.small),
+                    child: Material(
+                      color: AppColors.surface,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(AppSpacing.radius),
+                        side: const BorderSide(color: AppColors.border),
+                      ),
+                      child: ListTile(
+                        title: Text(
+                          item.title,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                          ),
+                        ),
+                        subtitle: Text(
+                          item.subtitle,
+                          style: const TextStyle(
+                            color: AppColors.muted,
+                            fontSize: 11,
+                          ),
+                        ),
+                        trailing: const Icon(
+                          Icons.chevron_right,
+                          color: AppColors.primary,
+                        ),
+                        // (7) kirim item yang dipilih ke layar Detail
+                        onTap: () => Navigator.pushNamed(
+                          context,
+                          AppRoutes.detail,
+                          arguments: item,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.section),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Keunggulan CookBox',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    TextButton(
+                      onPressed: () {},
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('Anti Ribet'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpacing.small),
+                const _AdvantageTile(
+                  icon: Icons.hourglass_bottom_rounded,
+                  iconBackground: Color(0xFFFFDAD0),
+                  iconColor: AppColors.accent,
+                  title: 'Bahan Sudah Ditakar',
+                  description:
+                      'Takaran sesuai resep dan jumlah porsi. Noli sia...',
+                ),
+                const SizedBox(height: AppSpacing.small),
+                const _AdvantageTile(
+                  icon: Icons.account_balance_wallet_outlined,
+                  iconBackground: Color(0xFFC7FFD4),
+                  iconColor: Color(0xFF28B957),
+                  title: 'Praktis & Hemat',
+                  description:
+                      'Tidak perlu belanja bahan satu per satu ke pasar.',
+                ),
+                const SizedBox(height: AppSpacing.small),
+                const _AdvantageTile(
+                  icon: Icons.storefront_outlined,
+                  iconBackground: Color(0xFFFFD9D1),
+                  iconColor: AppColors.accent,
+                  title: 'Dukung UMKM Lokal',
+                  description:
+                      'Pesan paket bahan secara langsung dari pedagang.',
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

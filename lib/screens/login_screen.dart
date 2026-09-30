@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/login_provider.dart';
-import 'home_screen.dart';
+import '../routes/app_routes.dart';
+import '../utils/validators.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/app_button.dart';
@@ -29,24 +30,18 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    final isValid = _formKey.currentState?.validate() ?? false;
+    if (!isValid) return;
     final success = await context.read<LoginProvider>().login(
       phone: _phoneController.text.trim(),
       password: _passwordController.text,
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          success
-              ? 'Masuk berhasil. Selamat datang di CookBox!'
-              : 'Masuk belum berhasil.',
-        ),
-      ),
-    );
-    if (success && mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute<void>(builder: (_) => const HomeScreen()),
+    if (success) {
+      Navigator.pushReplacementNamed(context, AppRoutes.home);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Masuk belum berhasil.')),
       );
     }
   }
@@ -72,6 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 constraints: const BoxConstraints(maxWidth: 460),
                 child: Form(
                   key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -98,10 +94,12 @@ class _LoginScreenState extends State<LoginScreen> {
                         prefixIcon: const Icon(Icons.phone_outlined, size: 15),
                         prefixText: '+62   ',
                         validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Nomor HP wajib diisi';
-                          }
-                          if (value.trim().length < 8) {
+                          final requiredError = Validators.requiredField(
+                            value,
+                            fieldName: 'Nomor HP',
+                          );
+                          if (requiredError != null) return requiredError;
+                          if (value!.trim().length < 8) {
                             return 'Masukkan nomor HP yang valid';
                           }
                           return null;
@@ -215,12 +213,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         width: double.infinity,
                         height: AppSpacing.buttonHeight,
                         child: OutlinedButton.icon(
-                          onPressed: () => Navigator.of(context)
-                              .pushReplacement(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => const HomeScreen(),
-                                ),
-                              ),
+                          onPressed: () => Navigator.pushReplacementNamed(
+                            context,
+                            AppRoutes.home,
+                          ),
                           icon: const Icon(Icons.account_circle, size: 15),
                           label: const Text('Lanjut sebagai Pengunjung'),
                           style: OutlinedButton.styleFrom(
