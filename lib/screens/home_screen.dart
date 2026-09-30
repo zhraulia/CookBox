@@ -1,14 +1,92 @@
 import 'package:flutter/material.dart';
 
+import '../routes/app_routes.dart';
+
+import '../data/item_repository.dart';
+import '../models/item.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
 import '../widgets/cookbox_logo.dart';
+import '../widgets/state_views.dart';
 
-class HomeScreen extends StatelessWidget {
+// (1) status tampilan
+enum ViewStatus { loading, success, error }
+
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
   static const _heroImage =
       'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=85';
+
+  // (2) variabel state
+  final _repository = ItemRepository();
+  ViewStatus _status = ViewStatus.loading;
+  List<Item> _items = [];
+  String _errorMessage = '';
+  bool _simulateError = false; // ubah ke true untuk menguji error state
+
+  // (3) ambil data saat layar pertama kali dibuka
+  @override
+  void initState() {
+    super.initState();
+    _loadItems();
+  }
+
+  // (4) mengambil data + menangani error
+  Future<void> _loadItems() async {
+    if (_status != ViewStatus.loading) {
+      setState(() => _status = ViewStatus.loading);
+    }
+    try {
+      final items = await _repository.fetchItems(simulateError: _simulateError);
+      if (!mounted) return;
+      setState(() {
+        _items = items;
+        _status = ViewStatus.success;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.toString().replaceFirst('Exception: ', '');
+        _status = ViewStatus.error;
+      });
+    }
+  }
+
+  // (5)(6) memilih tampilan: loading / error / empty / daftar data
+  Widget _buildContent() {
+    return switch (_status) {
+      ViewStatus.loading => const SizedBox(height: 200, child: LoadingView()),
+      ViewStatus.error => ErrorView(
+        message: _errorMessage,
+        onRetry: _loadItems,
+      ),
+      ViewStatus.success => _buildList(),
+    };
+  }
+
+  Widget _buildList() {
+    if (_items.isEmpty) {
+      return const EmptyView(message: 'Belum ada data.');
+    }
+    return Column(
+      children: [
+        for (final item in _items) ...[
+          _ItemCard(
+            item: item,
+            onTap: () =>
+                Navigator.pushNamed(context, AppRoutes.detail, arguments: item),
+          ),
+          const SizedBox(height: AppSpacing.small),
+        ],
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,6 +115,16 @@ class HomeScreen extends StatelessWidget {
                     const SizedBox(height: AppSpacing.field),
                     const _TodayHero(imageUrl: _heroImage),
                     const SizedBox(height: AppSpacing.section),
+
+                    // Bagian baru: daftar data dengan status loading/error/kosong
+                    Text(
+                      'Menu Pilihan',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: AppSpacing.small),
+                    _buildContent(),
+                    const SizedBox(height: AppSpacing.section),
+
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -87,6 +175,73 @@ class HomeScreen extends StatelessWidget {
               ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+// Kartu item, gayanya mengikuti _AdvantageTile dari Praktikum 1
+class _ItemCard extends StatelessWidget {
+  const _ItemCard({required this.item, required this.onTap});
+
+  final Item item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: AppColors.infoBackground,
+      borderRadius: BorderRadius.circular(AppSpacing.radius),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppSpacing.radius),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(9),
+          child: Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFDAD0),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.restaurant_menu,
+                  color: AppColors.accent,
+                  size: 17,
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: const TextStyle(
+                        color: AppColors.ink,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      item.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 8,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, size: 18),
+            ],
+          ),
         ),
       ),
     );
