@@ -5,6 +5,7 @@ import '../providers/login_provider.dart';
 import 'home_screen.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_spacing.dart';
+import '../utils/validators.dart';
 import '../widgets/app_button.dart';
 import '../widgets/app_text_field.dart';
 import '../widgets/cookbox_logo.dart';
@@ -29,7 +30,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    final isValid = _formKey.currentState?.validate() ?? false;
+    if (!isValid) return;
+
     final success = await context.read<LoginProvider>().login(
       phone: _phoneController.text.trim(),
       password: _passwordController.text,
@@ -72,6 +75,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 constraints: const BoxConstraints(maxWidth: 460),
                 child: Form(
                   key: _formKey,
+                  autovalidateMode: AutovalidateMode.onUserInteraction,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -97,15 +101,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         keyboardType: TextInputType.phone,
                         prefixIcon: const Icon(Icons.phone_outlined, size: 15),
                         prefixText: '+62   ',
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Nomor HP wajib diisi';
-                          }
-                          if (value.trim().length < 8) {
-                            return 'Masukkan nomor HP yang valid';
-                          }
-                          return null;
-                        },
+                        validator: (value) => Validators.minLength(
+                          value,
+                          8,
+                          fieldName: 'Nomor HP',
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.field),
                       _FieldLabel(label: 'Password'),
@@ -131,9 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             size: 16,
                           ),
                         ),
-                        validator: (value) => value == null || value.length < 6
-                            ? 'Password minimal 6 karakter'
-                            : null,
+                        validator: Validators.password,
                       ),
                       const SizedBox(height: AppSpacing.small),
                       Row(

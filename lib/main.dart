@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'providers/login_provider.dart';
-import 'screens/login_screen.dart';
+import 'routes/app_routes.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_text_styles.dart';
 
@@ -29,7 +29,9 @@ class MyApp extends StatelessWidget {
           textTheme: AppTextStyles.textTheme,
           useMaterial3: true,
         ),
-        home: const LoginScreen(),
+        initialRoute: AppRoutes.login,
+        onGenerateRoute: AppRoutes.onGenerateRoute,
+        onUnknownRoute: AppRoutes.onUnknownRoute,
       ),
     );
   }
