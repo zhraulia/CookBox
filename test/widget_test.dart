@@ -29,7 +29,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 950));
     await tester.pumpAndSettle();
 
-    expect(find.text('Keunggulan CookBox'), findsOneWidget);
-    expect(find.textContaining('Mau masak hari ini?'), findsOneWidget);
+    expect(find.text('Paket Bahan Terlaris'), findsOneWidget);
   });
 }

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
+
 import '../routes/app_routes.dart';
 import '../data/item_repository.dart';
 import '../models/item.dart';
 import '../theme/app_colors.dart';
-import '../theme/app_spacing.dart';
 import '../widgets/cookbox_logo.dart';
 import '../widgets/state_views.dart';
 
@@ -20,13 +20,38 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   static const _heroImage =
       'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=85';
+  static const _filterCategories = [
+    'Paket Masak',
+    'Segar',
+    'Lauk Instan',
+    'Hemat Kos',
+  ];
 
   // (2) variabel state
   final _repository = ItemRepository();
+  final _searchController = TextEditingController();
   ViewStatus _status = ViewStatus.loading;
   List<Item> _items = [];
   String _errorMessage = '';
-  bool _simulateError = false; // ubah ke true untuk menguji error state
+  Set<String> _selectedCategories = {};
+  final bool _simulateError = false; // ubah ke true untuk menguji error state
+
+  List<Item> get _filteredItems {
+    final query = _searchController.text.trim().toLowerCase();
+    return _items.where((item) {
+      final matchesQuery =
+          query.isEmpty ||
+          '${item.title} ${item.merchantName} ${item.category} ${item.subtitle}'
+              .toLowerCase()
+              .contains(query);
+      final matchesCategory =
+          _selectedCategories.isEmpty ||
+          _selectedCategories.any(
+            (category) => category.toLowerCase() == item.category.toLowerCase(),
+          );
+      return matchesQuery && matchesCategory;
+    }).toList();
+  }
 
   // (3) ambil data saat layar pertama kali dibuka
   @override
@@ -56,13 +81,98 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Future<void> _showCategoryFilter() async {
+    FocusManager.instance.primaryFocus?.unfocus();
+    var draftSelection = Set<String>.of(_selectedCategories);
+    final selection = await showModalBottomSheet<Set<String>>(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text(
+                        'Filter kategori',
+                        style: TextStyle(
+                          color: AppColors.ink,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => setSheetState(() => draftSelection = {}),
+                      child: const Text('Hapus'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final category in _filterCategories)
+                      FilterChip(
+                        label: Text(category),
+                        selected: draftSelection.contains(category),
+                        onSelected: (selected) => setSheetState(() {
+                          draftSelection = Set<String>.of(draftSelection);
+                          if (selected) {
+                            draftSelection.add(category);
+                          } else {
+                            draftSelection.remove(category);
+                          }
+                        }),
+                        selectedColor: const Color(0xFFFFE4D7),
+                        checkmarkColor: AppColors.primary,
+                        labelStyle: const TextStyle(fontSize: 12),
+                        side: const BorderSide(color: AppColors.border),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => Navigator.pop(
+                      sheetContext,
+                      Set<String>.of(draftSelection),
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                    ),
+                    child: const Text('Terapkan'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (selection != null && mounted) {
+      setState(() => _selectedCategories = selection);
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   // (5)(6) memilih tampilan: loading / error / empty / daftar data
   Widget _buildContent() {
     return switch (_status) {
-      ViewStatus.loading => const SizedBox(
-        height: 200,
-        child: LoadingView(),
-      ),
+      ViewStatus.loading => const SizedBox(height: 200, child: LoadingView()),
       ViewStatus.error => ErrorView(
         message: _errorMessage,
         onRetry: _loadItems,
@@ -71,25 +181,40 @@ class _HomeScreenState extends State<HomeScreen> {
     };
   }
 
+  void _openItem(Item item) {
+    Navigator.pushNamed(context, AppRoutes.detailMenu, arguments: item);
+  }
+
   Widget _buildList() {
-    if (_items.isEmpty) {
+    final items = _filteredItems;
+    if (items.isEmpty) {
+      if (_searchController.text.trim().isNotEmpty ||
+          _selectedCategories.isNotEmpty) {
+        return const EmptyView(
+          message: 'Menu tidak ditemukan',
+          icon: Icons.search_off_rounded,
+        );
+      }
       return const EmptyView(message: 'Belum ada data.');
     }
-    return Column(
-      children: [
-        for (final item in _items) ...[
-          _ItemCard(
-            item: item,
-            // (7) kirim item yang dipilih ke layar Detail
-            onTap: () => Navigator.pushNamed(
-              context,
-              AppRoutes.detail,
-              arguments: item,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.small),
-        ],
-      ],
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: items.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.78,
+      ),
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return _ItemCard(
+          item: item,
+          index: index,
+          onTap: () => _openItem(item),
+        );
+      },
     );
   }
 
@@ -99,81 +224,51 @@ class _HomeScreenState extends State<HomeScreen> {
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final horizontalPadding = constraints.maxWidth > 600
-                ? constraints.maxWidth * 0.2
-                : AppSpacing.page;
-            return SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                horizontalPadding,
-                AppSpacing.top,
-                horizontalPadding,
-                AppSpacing.page,
-              ),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 460),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const _HomeHeader(),
-                    const SizedBox(height: AppSpacing.section),
-                    const _CategoryChip(),
-                    const SizedBox(height: AppSpacing.field),
-                    const _TodayHero(imageUrl: _heroImage),
-                    const SizedBox(height: AppSpacing.section),
-
-                    // Bagian baru: daftar data dengan status loading/error/kosong
-                    Text(
-                      'Menu Pilihan',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    const SizedBox(height: AppSpacing.small),
-                    _buildContent(),
-                    const SizedBox(height: AppSpacing.section),
-
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Keunggulan CookBox',
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        TextButton(
-                          onPressed: () {},
-                          style: TextButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            final contentWidth = constraints.maxWidth > 600 ? 460.0 : null;
+            return Center(
+              child: SizedBox(
+                width: contentWidth,
+                child: CustomScrollView(
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
+                      sliver: SliverList(
+                        delegate: SliverChildListDelegate([
+                          const _HomeHeader(),
+                          const SizedBox(height: 14),
+                          _SearchBar(
+                            controller: _searchController,
+                            onChanged: (_) => setState(() {}),
+                            onFilter: _showCategoryFilter,
+                            selectedCategoryCount: _selectedCategories.length,
+                            onClear: () {
+                              _searchController.clear();
+                              setState(() {});
+                            },
                           ),
-                          child: const Text('Anti Ribet'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.small),
-                    const _AdvantageTile(
-                      icon: Icons.hourglass_bottom_rounded,
-                      iconBackground: Color(0xFFFFDAD0),
-                      iconColor: AppColors.accent,
-                      title: 'Bahan Sudah Ditakar',
-                      description:
-                          'Takaran sesuai resep dan jumlah porsi. Noli sia...',
-                    ),
-                    const SizedBox(height: AppSpacing.small),
-                    const _AdvantageTile(
-                      icon: Icons.account_balance_wallet_outlined,
-                      iconBackground: Color(0xFFC7FFD4),
-                      iconColor: Color(0xFF28B957),
-                      title: 'Praktis & Hemat',
-                      description:
-                          'Tidak perlu belanja bahan satu per satu ke pasar.',
-                    ),
-                    const SizedBox(height: AppSpacing.small),
-                    const _AdvantageTile(
-                      icon: Icons.storefront_outlined,
-                      iconBackground: Color(0xFFFFD9D1),
-                      iconColor: AppColors.accent,
-                      title: 'Dukung UMKM Lokal',
-                      description:
-                          'Pesan paket bahan secara langsung dari pedagang.',
+                          const SizedBox(height: 14),
+                          const _PromoBanner(),
+                          const SizedBox(height: 16),
+                          const SizedBox(height: 4),
+                          const _SectionHeading(
+                            title: 'Paket Bahan Terlaris',
+                            action: 'Lihat Semua',
+                          ),
+                          const SizedBox(height: 10),
+                          _buildContent(),
+                          if (_searchController.text.trim().isEmpty &&
+                              _selectedCategories.isEmpty) ...[
+                            const SizedBox(height: 20),
+                            const _SectionHeading(
+                              title: 'Menu Populer Mahasiswa',
+                              action: 'Lagi Tren',
+                            ),
+                            const SizedBox(height: 10),
+                            _PopularMenuGrid(items: _items, onTap: _openItem),
+                          ],
+                          const SizedBox(height: 14),
+                        ]),
+                      ),
                     ),
                   ],
                 ),
@@ -182,71 +277,126 @@ class _HomeScreenState extends State<HomeScreen> {
           },
         ),
       ),
+      bottomNavigationBar: const _HomeBottomBar(),
     );
   }
 }
 
 // Kartu item, gayanya mengikuti _AdvantageTile dari Praktikum 1
 class _ItemCard extends StatelessWidget {
-  const _ItemCard({required this.item, required this.onTap});
+  const _ItemCard({
+    required this.item,
+    required this.index,
+    required this.onTap,
+  });
 
   final Item item;
+  final int index;
   final VoidCallback onTap;
+
+  static const _images = [
+    'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=600&q=80',
+    'https://images.unsplash.com/photo-1547592166-23ac45744acd?auto=format&fit=crop&w=600&q=80',
+    'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=600&q=80',
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: AppColors.infoBackground,
-      borderRadius: BorderRadius.circular(AppSpacing.radius),
+      color: AppColors.surface,
+      borderRadius: BorderRadius.circular(12),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(AppSpacing.radius),
         onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(9),
-          child: Row(
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFDAD0),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.restaurant_menu,
-                  color: AppColors.accent,
-                  size: 17,
-                ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              flex: 6,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    item.imageUrl ?? _images[index % _images.length],
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const _FoodImageFallback(),
+                  ),
+                  Positioned(
+                    top: 7,
+                    left: 7,
+                    child: _SmallTag(
+                      label: index.isEven ? 'PAKET HEMAT' : 'FAVORIT',
+                      color: index.isEven
+                          ? const Color(0xFFB9F1D1)
+                          : const Color(0xFFFFD86F),
+                    ),
+                  ),
+                  const Positioned(
+                    top: 5,
+                    right: 5,
+                    child: CircleAvatar(
+                      radius: 13,
+                      backgroundColor: Colors.white,
+                      child: Icon(
+                        Icons.favorite_border_rounded,
+                        size: 15,
+                        color: AppColors.accent,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 9),
-              Expanded(
+            ),
+            Expanded(
+              flex: 5,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: AppColors.ink,
                         fontSize: 10,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.ink,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       item.subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: AppColors.muted,
                         fontSize: 8,
+                        color: AppColors.muted,
                       ),
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        const Icon(Icons.star, size: 11, color: Colors.orange),
+                        const SizedBox(width: 2),
+                        const Text('4.9', style: TextStyle(fontSize: 8)),
+                        const Spacer(),
+                        Text(
+                          item.priceLabel,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, size: 18),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -259,133 +409,187 @@ class _HomeHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const CookBoxLogo(compact: true),
         const Spacer(),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFE1D7),
-            borderRadius: BorderRadius.circular(AppSpacing.compactRadius),
-          ),
-          child: Text(
-            'Masak Praktis, Bahan Pas',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: AppColors.primaryDark,
-              fontSize: 8,
-              fontWeight: FontWeight.w600,
+        _HeaderAction(icon: Icons.favorite_border_rounded),
+        const SizedBox(width: 8),
+        _HeaderAction(icon: Icons.shopping_bag_outlined),
+        const SizedBox(width: 8),
+        _HeaderAction(icon: Icons.notifications_none_rounded),
+      ],
+    );
+  }
+}
+
+class _SearchBar extends StatelessWidget {
+  const _SearchBar({
+    required this.controller,
+    required this.onChanged,
+    required this.onFilter,
+    required this.selectedCategoryCount,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onFilter;
+  final int selectedCategoryCount;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 42,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.search, color: AppColors.accent, size: 18),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    onChanged: onChanged,
+                    textInputAction: TextInputAction.search,
+                    style: const TextStyle(fontSize: 10, color: AppColors.ink),
+                    decoration: const InputDecoration(
+                      hintText: 'Cari menu atau UMKM...',
+                      hintStyle: TextStyle(
+                        color: AppColors.muted,
+                        fontSize: 10,
+                      ),
+                      border: InputBorder.none,
+                      isDense: true,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ),
+                if (controller.text.isNotEmpty)
+                  IconButton(
+                    onPressed: onClear,
+                    tooltip: 'Hapus pencarian',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 24,
+                      height: 28,
+                    ),
+                    icon: const Icon(
+                      Icons.close_rounded,
+                      color: AppColors.muted,
+                      size: 16,
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
-        const Spacer(),
-        Container(
-          width: AppSpacing.backButton,
-          height: AppSpacing.backButton,
-          decoration: const BoxDecoration(
-            color: Color(0xFFE8F0FF),
-            shape: BoxShape.circle,
+        const SizedBox(width: 8),
+        SizedBox(
+          height: 42,
+          child: OutlinedButton.icon(
+            key: const ValueKey('category-filter'),
+            onPressed: onFilter,
+            icon: const Icon(Icons.tune_rounded, size: 16),
+            label: Text(
+              selectedCategoryCount == 0
+                  ? 'Filter'
+                  : 'Filter $selectedCategoryCount',
+              style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: selectedCategoryCount > 0
+                  ? AppColors.primary
+                  : AppColors.ink,
+              padding: const EdgeInsets.symmetric(horizontal: 9),
+              side: BorderSide(
+                color: selectedCategoryCount > 0
+                    ? AppColors.accent
+                    : AppColors.border,
+              ),
+            ),
           ),
-          child: const Icon(Icons.help_outline, size: 16),
         ),
       ],
     );
   }
 }
 
-class _CategoryChip extends StatelessWidget {
-  const _CategoryChip();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFFE4DB),
-        borderRadius: BorderRadius.circular(AppSpacing.compactRadius),
-      ),
-      child: const Text(
-        'Masak Praktis, Bahan Pas',
-        style: TextStyle(
-          color: AppColors.primaryDark,
-          fontSize: 8,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-class _TodayHero extends StatelessWidget {
-  const _TodayHero({required this.imageUrl});
-
-  final String imageUrl;
+class _PromoBanner extends StatelessWidget {
+  const _PromoBanner();
 
   @override
   Widget build(BuildContext context) {
     return ClipRRect(
-      borderRadius: BorderRadius.circular(AppSpacing.radius),
-      child: Container(
-        color: AppColors.surface,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      borderRadius: BorderRadius.circular(14),
+      child: SizedBox(
+        height: 130,
+        child: Stack(
+          fit: StackFit.expand,
           children: [
-            SizedBox(
-              height: 172,
-              width: double.infinity,
-              child: Stack(
-                fit: StackFit.expand,
+            Image.network(
+              _HomeScreenState._heroImage,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) =>
+                  const ColoredBox(color: AppColors.primary),
+            ),
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xE8F16A00), Color(0x30F16A00)],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Image.network(
-                    imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const _HeroFallback(),
+                  const _SmallTag(
+                    label: 'SPESIAL KOS',
+                    color: Color(0xFFFFD84D),
                   ),
-                  DecoratedBox(
+                  const SizedBox(height: 7),
+                  const Text(
+                    'Masak Lezat, Hemat s/d\n40%',
+                    style: TextStyle(
+                      color: Colors.white,
+                      height: 1.05,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Paket bahan serba praktis buatmu.',
+                    style: TextStyle(color: Colors.white, fontSize: 9),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.72),
-                        ],
-                      ),
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                  ),
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(
-                          AppSpacing.compactRadius,
-                        ),
-                      ),
-                      child: const Text(
-                        '✓ 100% Porsi Tepat',
-                        style: TextStyle(
-                          color: AppColors.primaryDark,
-                          fontSize: 8,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const Positioned(
-                    left: 12,
-                    bottom: 12,
-                    child: Text(
-                      'SOLUSI KOST & KAMPUS\nMau masak hari ini?',
+                    child: const Text(
+                      'Klaim Voucher  ›',
                       style: TextStyle(
-                        color: AppColors.surface,
-                        fontSize: 18,
-                        height: 1.12,
+                        color: AppColors.primary,
+                        fontSize: 9,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
@@ -393,65 +597,6 @@ class _TodayHero extends StatelessWidget {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-              child: Text(
-                'Pilih menu favoritmu, kami siapkan bahan segar yang sudah dipotong & ditakar pas untuk porsi kamu. Tinggal olah!',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.muted,
-                  fontSize: 10,
-                  height: 1.45,
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 6, 12, 4),
-              child: SizedBox(
-                width: double.infinity,
-                height: 42,
-                child: FilledButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.arrow_forward, size: 14),
-                  label: const Text('Mulai Sekarang'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(AppSpacing.radius),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Center(
-              child: TextButton(
-                onPressed: () {},
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text.rich(
-                  TextSpan(
-                    text: 'Sudah punya akun? ',
-                    style: TextStyle(color: AppColors.muted, fontSize: 9),
-                    children: [
-                      TextSpan(
-                        text: 'Masuk di sini',
-                        style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
           ],
         ),
       ),
@@ -459,83 +604,303 @@ class _TodayHero extends StatelessWidget {
   }
 }
 
-class _HeroFallback extends StatelessWidget {
-  const _HeroFallback();
+class _SectionHeading extends StatelessWidget {
+  const _SectionHeading({required this.title, required this.action});
+
+  final String title;
+  final String action;
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(
-      color: const Color(0xFF9A6C43),
-      child: Center(
-        child: Icon(
-          Icons.restaurant_menu,
-          size: 60,
-          color: Colors.white.withValues(alpha: 0.8),
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+              color: AppColors.ink,
+            ),
+          ),
+        ),
+        Text(
+          action,
+          style: const TextStyle(
+            color: AppColors.primary,
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const Icon(Icons.chevron_right, size: 14, color: AppColors.primary),
+      ],
+    );
+  }
+}
+
+class _PopularMenuGrid extends StatelessWidget {
+  const _PopularMenuGrid({required this.items, required this.onTap});
+
+  final List<Item> items;
+  final ValueChanged<Item> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: items.length,
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 10,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.78,
+      ),
+      itemBuilder: (context, index) {
+        final item = items[index];
+        return Material(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => onTap(item),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 6,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.network(
+                        item.imageUrl ??
+                            _ItemCard._images[index % _ItemCard._images.length],
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const _FoodImageFallback(),
+                      ),
+                      Positioned(
+                        top: 7,
+                        left: 7,
+                        child: _SmallTag(
+                          label: item.category,
+                          color: index.isEven
+                              ? const Color(0xFFF6A85D)
+                              : const Color(0xFF55C890),
+                        ),
+                      ),
+                      const Positioned(
+                        top: 5,
+                        right: 5,
+                        child: CircleAvatar(
+                          radius: 13,
+                          backgroundColor: Colors.white,
+                          child: Icon(
+                            Icons.favorite_border,
+                            size: 15,
+                            color: AppColors.accent,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  flex: 5,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          item.merchantName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 8,
+                            color: AppColors.muted,
+                          ),
+                        ),
+                        const Spacer(),
+                        Row(
+                          children: [
+                            Text(
+                              item.priceLabel,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                            const Spacer(),
+                            const CircleAvatar(
+                              radius: 10,
+                              backgroundColor: AppColors.accent,
+                              child: Icon(
+                                Icons.add,
+                                size: 14,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _HomeBottomBar extends StatelessWidget {
+  const _HomeBottomBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      top: false,
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        padding: const EdgeInsets.fromLTRB(14, 8, 14, 5),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.spaceAround,
+          children: [
+            _NavigationItem(
+              icon: Icons.home_filled,
+              label: 'Beranda',
+              selected: true,
+            ),
+            _NavigationItem(icon: Icons.restaurant_menu_rounded, label: 'Menu'),
+            _NavigationItem(
+              icon: Icons.receipt_long_outlined,
+              label: 'Pesanan',
+            ),
+            _NavigationItem(icon: Icons.storefront_outlined, label: 'UMKM'),
+            _NavigationItem(
+              icon: Icons.person_outline_rounded,
+              label: 'Bantuan',
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _AdvantageTile extends StatelessWidget {
-  const _AdvantageTile({
+class _NavigationItem extends StatelessWidget {
+  const _NavigationItem({
     required this.icon,
-    required this.iconBackground,
-    required this.iconColor,
-    required this.title,
-    required this.description,
+    required this.label,
+    this.selected = false,
   });
 
   final IconData icon;
-  final Color iconBackground;
-  final Color iconColor;
-  final String title;
-  final String description;
+  final String label;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? AppColors.accent : AppColors.muted;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(height: 3),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 8,
+            color: color,
+            fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeaderAction extends StatelessWidget {
+  const _HeaderAction({required this.icon});
+
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(9),
+      width: 28,
+      height: 28,
       decoration: BoxDecoration(
-        color: AppColors.infoBackground,
-        borderRadius: BorderRadius.circular(AppSpacing.radius),
+        shape: BoxShape.circle,
+        color: Colors.white,
+        border: Border.all(color: AppColors.border),
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 30,
-            height: 30,
-            decoration: BoxDecoration(
-              color: iconBackground,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: iconColor, size: 17),
-          ),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: AppColors.ink,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  description,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: AppColors.muted, fontSize: 8),
-                ),
-              ],
-            ),
-          ),
-        ],
+      child: Icon(icon, size: 15, color: AppColors.muted),
+    );
+  }
+}
+
+class _SmallTag extends StatelessWidget {
+  const _SmallTag({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 110),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 7,
+          fontWeight: FontWeight.w900,
+          color: AppColors.ink,
+        ),
+      ),
+    );
+  }
+}
+
+class _FoodImageFallback extends StatelessWidget {
+  const _FoodImageFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    return const ColoredBox(
+      color: Color(0xFFFFE7D7),
+      child: Center(
+        child: Icon(
+          Icons.restaurant_rounded,
+          color: AppColors.accent,
+          size: 30,
+        ),
       ),
     );
   }
