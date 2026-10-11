@@ -782,21 +782,28 @@ class _HomeBottomBar extends StatelessWidget {
           border: Border(top: BorderSide(color: AppColors.border)),
         ),
         padding: const EdgeInsets.fromLTRB(14, 8, 14, 5),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _NavigationItem(
+            const _NavigationItem(
               icon: Icons.home_filled,
               label: 'Beranda',
               selected: true,
             ),
-            _NavigationItem(icon: Icons.restaurant_menu_rounded, label: 'Menu'),
-            _NavigationItem(
+            const _NavigationItem(
+              icon: Icons.restaurant_menu_rounded,
+              label: 'Menu',
+            ),
+            const _NavigationItem(
               icon: Icons.receipt_long_outlined,
               label: 'Pesanan',
             ),
-            _NavigationItem(icon: Icons.storefront_outlined, label: 'UMKM'),
             _NavigationItem(
+              icon: Icons.storefront_outlined,
+              label: 'UMKM',
+              onTap: () => Navigator.pushNamed(context, AppRoutes.umkmList),
+            ),
+            const _NavigationItem(
               icon: Icons.person_outline_rounded,
               label: 'Bantuan',
             ),
@@ -812,29 +819,37 @@ class _NavigationItem extends StatelessWidget {
     required this.icon,
     required this.label,
     this.selected = false,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
   final bool selected;
 
+  /// Aksi saat item diketuk. Kosong berarti item belum punya tujuan.
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
     final color = selected ? AppColors.accent : AppColors.muted;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(height: 3),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 8,
-            color: color,
-            fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(height: 3),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 8,
+              color: color,
+              fontWeight: selected ? FontWeight.w800 : FontWeight.w500,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

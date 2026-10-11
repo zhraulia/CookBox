@@ -11,6 +11,9 @@ import '../screens/merchant_directory_screen.dart';
 import '../screens/not_found_screen.dart';
 import '../screens/order_status_screen.dart';
 import '../screens/support_screen.dart';
+import '../screens/umkm_list_screen.dart';
+import '../models/umkm.dart';
+import '../screens/umkm_detail_screen.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -24,6 +27,8 @@ class AppRoutes {
   static const String orderStatus = '/order-status';
   static const String support = '/support';
   static const String catatanForm = '/catatan-form';
+  static const String umkmList = '/umkm-list';
+  static const String umkmDetail = '/umkm-detail';
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -85,6 +90,21 @@ class AppRoutes {
           builder: (_) => const CatatanFormScreen(),
           settings: settings,
         );
+      case umkmList:
+        return MaterialPageRoute<void>(
+          builder: (_) => const UmkmListScreen(),
+          settings: settings,
+        );
+      case umkmDetail:
+        // Argument WAJIB berupa Umkm, cek tipenya dulu
+        final args = settings.arguments;
+        if (args is Umkm) {
+          return MaterialPageRoute<void>(
+            builder: (_) => UmkmDetailScreen(umkm: args),
+            settings: settings,
+          );
+        }
+        return null;
       default:
         return null; // route tidak terdaftar -> halaman 404
     }
