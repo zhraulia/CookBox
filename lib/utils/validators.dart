@@ -23,8 +23,7 @@ class Validators {
   }
 
   static String? password(String? value) {
-    if (value == null || value.isEmpty) return 'Password wajib diisi';
-    if (value.length < 8) return 'Password minimal 8 karakter';
+    if (value == null || value.length < 6) return 'Password minimal 6 karakter';
     return null;
   }
 
