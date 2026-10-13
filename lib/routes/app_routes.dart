@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../models/item.dart';
+import '../data/item_repository.dart';
+import '../models/umkm.dart';
+import '../providers/cart_provider.dart';
 import '../screens/cart_checkout_screen.dart';
+import '../screens/cart_screen.dart';
 import '../screens/catatan_form_screen.dart';
 import '../screens/detail_menu_screen.dart';
 import '../screens/detail_screen.dart';
@@ -11,9 +15,8 @@ import '../screens/merchant_directory_screen.dart';
 import '../screens/not_found_screen.dart';
 import '../screens/order_status_screen.dart';
 import '../screens/support_screen.dart';
-import '../screens/umkm_list_screen.dart';
-import '../models/umkm.dart';
 import '../screens/umkm_detail_screen.dart';
+import '../screens/umkm_list_screen.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -22,6 +25,7 @@ class AppRoutes {
   static const String home = '/home';
   static const String detail = '/detail';
   static const String detailMenu = '/detail-menu';
+  static const String cart = '/cart';
   static const String checkout = '/checkout';
   static const String merchants = '/merchants';
   static const String orderStatus = '/order-status';
@@ -60,11 +64,24 @@ class AppRoutes {
           );
         }
         return null;
+      case cart:
+        return MaterialPageRoute<void>(
+          builder: (_) => const CartScreen(),
+          settings: settings,
+        );
       case checkout:
+        Item? item;
         final args = settings.arguments;
         if (args is Item) {
+          item = args;
+        } else if (CartProvider.instance.isNotEmpty) {
+          item = CartProvider.instance.items.first.item;
+        } else {
+          item = ItemRepository.findById('1');
+        }
+        if (item != null) {
           return MaterialPageRoute<void>(
-            builder: (_) => CartCheckoutScreen(item: args),
+            builder: (_) => CartCheckoutScreen(item: item!),
             settings: settings,
           );
         }

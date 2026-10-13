@@ -6,6 +6,7 @@ import 'package:nama_project/screens/detail_menu_screen.dart';
 import 'package:nama_project/screens/merchant_directory_screen.dart';
 import 'package:nama_project/screens/order_status_screen.dart';
 import 'package:nama_project/screens/support_screen.dart';
+import 'package:nama_project/routes/app_routes.dart';
 
 void main() {
   final item = Item(
@@ -36,8 +37,8 @@ void main() {
     await tester.pumpWidget(MaterialApp(home: DetailMenuScreen(item: item)));
     await tester.pumpAndSettle();
 
-    expect(find.text('Tambah ke Keranjang'), findsOneWidget);
-    expect(find.text('Detail Menu'), findsOneWidget);
+    expect(find.text('Tambah'), findsWidgets);
+    expect(find.text('Detail Resep & Paket'), findsOneWidget);
   });
 
   testWidgets('detail menu tampilkan data bahan, waktu, dan rekomendasi', (
@@ -123,5 +124,41 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  testWidgets('detail menu navigasi ke checkout saat Tambah ke Keranjang ditekan', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        onGenerateRoute: AppRoutes.onGenerateRoute,
+        home: DetailMenuScreen(item: item),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Tambah'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Checkout'), findsOneWidget);
+    expect(find.text('Konfirmasi & Bayar'), findsOneWidget);
+  });
+
+  testWidgets('checkout navigasi ke status pesanan saat Konfirmasi & Bayar ditekan', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        onGenerateRoute: AppRoutes.onGenerateRoute,
+        home: CartCheckoutScreen(item: item),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Konfirmasi & Bayar'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Status Pesanan'), findsOneWidget);
+    expect(find.text('Pesanan berhasil dibuat'), findsOneWidget);
   });
 }
