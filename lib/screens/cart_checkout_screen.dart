@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/cart_item.dart';
 import '../models/item.dart';
+import '../models/order_status_args.dart'; // [BARU] import model args
 import '../providers/cart_provider.dart';
 import '../routes/app_routes.dart';
 import '../theme/app_colors.dart';
@@ -246,8 +247,20 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
               ),
               FilledButton.icon(
                 onPressed: () {
-                  // Algoritma Checkout: Kosongkan keranjang dan buka status pesanan
+                  // [BARU] Siapkan data OrderStatusArgs sebelum keranjang dikosongkan
+                  final checkoutItem = widget.item;
+                  final checkoutQty = _cart.totalItemCount;
+                  final checkoutMode = _cart.deliveryMode;
+                  // Rumus total sesuai instruksi: (price ?? 0) * qty - 5000
+                  final checkoutTotal =
+                      (checkoutItem.price ?? 0) * checkoutQty - 5000;
+                  // Kode pesanan unik berbasis timestamp
+                  final orderCode =
+                      'CB-${DateTime.now().millisecondsSinceEpoch}';
+
+                  // Kosongkan keranjang setelah data tersimpan ke variabel lokal
                   _cart.clear();
+
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(
@@ -257,9 +270,18 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
                       behavior: SnackBarBehavior.floating,
                     ),
                   );
+
+                  // [BARU] Kirim OrderStatusArgs sebagai arguments
                   Navigator.pushReplacementNamed(
                     context,
                     AppRoutes.orderStatus,
+                    arguments: OrderStatusArgs(
+                      item: checkoutItem,
+                      quantity: checkoutQty,
+                      deliveryMode: checkoutMode,
+                      totalPrice: checkoutTotal,
+                      orderCode: orderCode,
+                    ),
                   );
                 },
                 icon: const Icon(Icons.lock_rounded, size: 16),
