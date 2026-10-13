@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/item_repository.dart';
 import '../models/item.dart';
+import '../providers/cart_provider.dart';
 import '../routes/app_routes.dart';
 import '../theme/app_colors.dart';
 
@@ -14,10 +15,27 @@ class DetailMenuScreen extends StatefulWidget {
 }
 
 class _DetailMenuScreenState extends State<DetailMenuScreen> {
+  final CartProvider _cart = CartProvider.instance;
   bool _favorite = false;
   int _quantity = 1;
   String _tab = 'Komposisi Bahan';
   final List<String> _tabs = const ['Komposisi Bahan', 'Cara Masak', 'Info UMKM'];
+
+  @override
+  void initState() {
+    super.initState();
+    _cart.addListener(_onCartChanged);
+  }
+
+  @override
+  void dispose() {
+    _cart.removeListener(_onCartChanged);
+    super.dispose();
+  }
+
+  void _onCartChanged() {
+    if (mounted) setState(() {});
+  }
 
   // Add-ons tracking
   final Map<String, int> _addons = {
@@ -70,6 +88,16 @@ class _DetailMenuScreenState extends State<DetailMenuScreen> {
           ],
         ),
         actions: [
+          IconButton(
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.cart),
+            icon: Badge(
+              isLabelVisible: _cart.isNotEmpty,
+              label: Text('${_cart.totalItemCount}'),
+              backgroundColor: AppColors.primary,
+              child: const Icon(Icons.shopping_cart_outlined, color: AppColors.ink),
+            ),
+            tooltip: 'Lihat Keranjang',
+          ),
           IconButton(
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -428,9 +456,45 @@ class _DetailMenuScreenState extends State<DetailMenuScreen> {
                 ),
               ),
 
-              // Add to Cart Button
+              // Quick Add-to-cart button
+              IconButton.filledTonal(
+                onPressed: () {
+                  final activeAddons = _addons.entries
+                      .where((e) => e.value > 0)
+                      .map((e) => '${e.key} (${e.value}x)')
+                      .toList();
+                  _cart.addItem(item, quantity: _quantity, addons: activeAddons);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('${item.title} ($_quantity porsi) ditambahkan ke keranjang!'),
+                      behavior: SnackBarBehavior.floating,
+                      duration: const Duration(seconds: 2),
+                      action: SnackBarAction(
+                        label: 'Keranjang',
+                        textColor: const Color(0xFFFFD84D),
+                        onPressed: () => Navigator.pushNamed(context, AppRoutes.cart),
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.add_shopping_cart_rounded, size: 20, color: AppColors.primary),
+                style: IconButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFECE5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  padding: const EdgeInsets.all(12),
+                ),
+                tooltip: 'Tambah ke Keranjang',
+              ),
+              const SizedBox(width: 8),
+
+              // Add to Cart & Checkout Button
               FilledButton(
                 onPressed: () {
+                  final activeAddons = _addons.entries
+                      .where((e) => e.value > 0)
+                      .map((e) => '${e.key} (${e.value}x)')
+                      .toList();
+                  _cart.addItem(item, quantity: _quantity, addons: activeAddons);
                   Navigator.pushNamed(
                     context,
                     AppRoutes.checkout,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/item_repository.dart';
 import '../models/item.dart';
+import '../providers/cart_provider.dart';
 import '../routes/app_routes.dart';
 import '../theme/app_colors.dart';
 import '../widgets/state_views.dart';
@@ -18,6 +19,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _repository = ItemRepository();
   final _searchController = TextEditingController();
+  final CartProvider _cart = CartProvider.instance;
   ViewStatus _status = ViewStatus.loading;
   List<Item> _items = [];
   String _errorMessage = '';
@@ -42,7 +44,12 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _cart.addListener(_onCartChanged);
     _loadItems();
+  }
+
+  void _onCartChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadItems() async {
@@ -149,6 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _cart.removeListener(_onCartChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -229,14 +237,19 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // 7. FLOATING CART PILL BAR AT BOTTOM
+            // 7. FLOATING CART PILL BAR AT BOTTOM (Dinamis dari CartProvider)
             Positioned(
               left: 16,
               right: 16,
               bottom: 12,
               child: _FloatingCartBar(
+                itemCount: _cart.totalItemCount,
+                totalAmount: _cart.grandTotal,
+                onTapCart: () => Navigator.pushNamed(context, AppRoutes.cart),
                 onCheckout: () {
-                  final defaultItem = ItemRepository.findById('1');
+                  final defaultItem = _cart.isNotEmpty
+                      ? _cart.items.first.item
+                      : ItemRepository.findById('1');
                   if (defaultItem != null) {
                     Navigator.pushNamed(
                       context,
@@ -1288,26 +1301,44 @@ class _BestSellerCard extends StatelessWidget {
                           ],
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.add, size: 12, color: Colors.white),
-                            SizedBox(width: 2),
-                            Text(
-                              'Tambah',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
+                      InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () {
+                          CartProvider.instance.addItem(item, quantity: 1);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('${item.title} ditambahkan ke keranjang!'),
+                              duration: const Duration(seconds: 2),
+                              behavior: SnackBarBehavior.floating,
+                              action: SnackBarAction(
+                                label: 'Keranjang',
+                                textColor: const Color(0xFFFFD84D),
+                                onPressed: () => Navigator.pushNamed(context, AppRoutes.cart),
                               ),
                             ),
-                          ],
+                          );
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.add, size: 12, color: Colors.white),
+                              SizedBox(width: 2),
+                              Text(
+                                'Tambah',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -1503,7 +1534,16 @@ class _PopularGridCard extends StatelessWidget {
 // FLOATING CART PILL BAR
 // ============================================================================
 class _FloatingCartBar extends StatelessWidget {
-  const _FloatingCartBar({required this.onCheckout});
+  const _FloatingCartBar({
+    required this.itemCount,
+    required this.totalAmount,
+    required this.onTapCart,
+    required this.onCheckout,
+  });
+
+  final int itemCount;
+  final int totalAmount;
+  final VoidCallback onTapCart;
   final VoidCallback onCheckout;
 
   @override
@@ -1523,65 +1563,72 @@ class _FloatingCartBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Orange bag icon with '2' badge
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: const BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.shopping_bag_outlined,
-                  color: Colors.white,
-                  size: 18,
-                ),
-              ),
-              Positioned(
-                top: -3,
-                right: -3,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
+          // Orange bag icon with badge
+          GestureDetector(
+            onTap: onTapCart,
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
                   decoration: const BoxDecoration(
-                    color: Color(0xFFFFD54F),
+                    color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
-                  child: const Text(
-                    '2',
-                    style: TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.black87,
+                  child: const Icon(
+                    Icons.shopping_bag_outlined,
+                    color: Colors.white,
+                    size: 18,
+                  ),
+                ),
+                Positioned(
+                  top: -3,
+                  right: -3,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFFD54F),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(
+                      '$itemCount',
+                      style: const TextStyle(
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.black87,
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(width: 12),
 
-          // Total & Item Summary
+          // Total & Item Summary (Tappable to open Cart)
           Expanded(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  '2 Paket Bahan Dipilih',
-                  style: TextStyle(color: Colors.white70, fontSize: 10),
-                ),
-                Text(
-                  'Rp 38.000',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: onTapCart,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '$itemCount Paket Bahan Dipilih',
+                    style: const TextStyle(color: Colors.white70, fontSize: 10),
                   ),
-                ),
-              ],
+                  Text(
+                    'Rp ${totalAmount.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
 

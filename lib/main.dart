@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'providers/cart_provider.dart';
 import 'providers/login_provider.dart';
 import 'routes/app_routes.dart';
 import 'theme/app_colors.dart';
@@ -15,8 +16,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => LoginProvider(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => LoginProvider()),
+        ChangeNotifierProvider.value(value: CartProvider.instance),
+      ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'CookBox',

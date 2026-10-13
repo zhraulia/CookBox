@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../models/cart_item.dart';
 import '../models/item.dart';
+import '../providers/cart_provider.dart';
 import '../routes/app_routes.dart';
 import '../theme/app_colors.dart';
 
@@ -13,20 +15,37 @@ class CartCheckoutScreen extends StatefulWidget {
 }
 
 class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
-  String _mode = 'Diantar ke Alamat';
-  int _item1Qty = 1;
-  int _item2Qty = 1;
-  String _selectedPayment = 'qris';
+  final CartProvider _cart = CartProvider.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    // Jika keranjang kosong, pastikan item yang dibawa masuk ke keranjang
+    if (_cart.isEmpty) {
+      _cart.addItem(widget.item, quantity: 1);
+    }
+    _cart.addListener(_onCartChanged);
+  }
+
+  @override
+  void dispose() {
+    _cart.removeListener(_onCartChanged);
+    super.dispose();
+  }
+
+  void _onCartChanged() {
+    if (mounted) setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
-    const item1Price = 24500;
-    const item2Price = 14500;
-    final subtotal = (_item1Qty * item1Price) + (_item2Qty * item2Price);
-    const shippingFee = 6000;
-    const packagingFee = 2000;
-    const discount = 5000;
-    final grandTotal = subtotal + shippingFee + packagingFee - discount;
+    final subtotal = _cart.subtotal;
+    final shippingFee = _cart.shippingFee;
+    final packagingFee = _cart.packagingFee;
+    final discount = _cart.discount;
+    final grandTotal = _cart.grandTotal;
+    final mode = _cart.deliveryMode;
+    final selectedPayment = _cart.paymentMethod;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F9FA),
@@ -93,23 +112,23 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
 
           // 2. TOGGLE: Diantar ke Alamat / Ambil ke UMKM
           _DeliveryModeToggle(
-            selectedMode: _mode,
-            onChanged: (mode) => setState(() => _mode = mode),
+            selectedMode: mode,
+            onChanged: (newMode) => _cart.setDeliveryMode(newMode),
           ),
           const SizedBox(height: 14),
 
           // 3. ADDRESS CARD
-          _mode == 'Diantar ke Alamat'
+          mode == 'Diantar ke Alamat'
               ? const _AddressCard()
               : const _PickupStoreCard(),
           const SizedBox(height: 16),
 
-          // 4. ITEM PESANAN CARD
+          // 4. ITEM PESANAN CARD (Dinamis dari CartProvider)
           _OrderItemsCard(
-            item1Qty: _item1Qty,
-            item2Qty: _item2Qty,
-            onItem1Changed: (qty) => setState(() => _item1Qty = qty),
-            onItem2Changed: (qty) => setState(() => _item2Qty = qty),
+            items: _cart.items,
+            onIncrement: (id) => _cart.incrementQuantity(id),
+            onDecrement: (id) => _cart.decrementQuantity(id),
+            onRemove: (id) => _cart.removeItem(id),
           ),
           const SizedBox(height: 16),
 
@@ -119,8 +138,8 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
 
           // 6. METODE PEMBAYARAN
           _PaymentMethodCard(
-            selected: _selectedPayment,
-            onChanged: (val) => setState(() => _selectedPayment = val),
+            selected: selectedPayment,
+            onChanged: (val) => _cart.setPaymentMethod(val),
           ),
           const SizedBox(height: 16),
 
@@ -227,6 +246,8 @@ class _CartCheckoutScreenState extends State<CartCheckoutScreen> {
               ),
               FilledButton.icon(
                 onPressed: () {
+                  // Algoritma Checkout: Kosongkan keranjang dan buka status pesanan
+                  _cart.clear();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(
@@ -608,16 +629,16 @@ class _PickupStoreCard extends StatelessWidget {
 // ============================================================================
 class _OrderItemsCard extends StatelessWidget {
   const _OrderItemsCard({
-    required this.item1Qty,
-    required this.item2Qty,
-    required this.onItem1Changed,
-    required this.onItem2Changed,
+    required this.items,
+    required this.onIncrement,
+    required this.onDecrement,
+    required this.onRemove,
   });
 
-  final int item1Qty;
-  final int item2Qty;
-  final ValueChanged<int> onItem1Changed;
-  final ValueChanged<int> onItem2Changed;
+  final List<CartItem> items;
+  final ValueChanged<String> onIncrement;
+  final ValueChanged<String> onDecrement;
+  final ValueChanged<String> onRemove;
 
   @override
   Widget build(BuildContext context) {
@@ -644,58 +665,50 @@ class _OrderItemsCard extends StatelessWidget {
                   color: const Color(0xFFFFF0E8),
                   borderRadius: BorderRadius.circular(5),
                 ),
-                child: const Text(
-                  '2 Menu Masak',
-                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppColors.primary),
+                child: Text(
+                  '${items.fold(0, (sum, i) => sum + i.quantity)} Menu Masak',
+                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppColors.primary),
                 ),
               ),
               const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE6F8F0),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.check_circle_outline_rounded, size: 12, color: Color(0xFF008955)),
-                    SizedBox(width: 4),
-                    Text(
-                      'Dapur Bu Sri',
-                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFF008955)),
-                    ),
-                  ],
+              TextButton.icon(
+                onPressed: () => Navigator.pushNamed(context, AppRoutes.cart),
+                icon: const Icon(Icons.shopping_bag_outlined, size: 13, color: AppColors.primary),
+                label: const Text(
+                  'Lihat Keranjang',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.primary),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-
-          // Item 1: Paket Ayam Kuluyuk
-          _buildItemRow(
-            imageUrl:
-                'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=400&q=80',
-            title: 'Paket Ayam Kulu...',
-            subtitle: 'Bahan siap masak • 1 porsi',
-            price: 'Rp 24.500',
-            quantity: item1Qty,
-            onDecrement: () => onItem1Changed(item1Qty > 1 ? item1Qty - 1 : 1),
-            onIncrement: () => onItem1Changed(item1Qty + 1),
-          ),
-          const Divider(height: 16),
-
-          // Item 2: Sayur Asem & Telur
-          _buildItemRow(
-            imageUrl:
-                'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=400&q=80',
-            title: 'Sayur Asem & Te...',
-            subtitle: 'Sayur segar lokal • 1 porsi',
-            price: 'Rp 14.500',
-            quantity: item2Qty,
-            onDecrement: () => onItem2Changed(item2Qty > 1 ? item2Qty - 1 : 1),
-            onIncrement: () => onItem2Changed(item2Qty + 1),
-          ),
+          if (items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: Center(
+                child: Text('Tidak ada item di keranjang', style: TextStyle(color: AppColors.muted, fontSize: 12)),
+              ),
+            )
+          else
+            ...items.asMap().entries.map((entry) {
+              final index = entry.key;
+              final cartItem = entry.value;
+              return Column(
+                children: [
+                  if (index > 0) const Divider(height: 16),
+                  _buildItemRow(
+                    imageUrl: cartItem.item.imageUrl ??
+                        'https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=400&q=80',
+                    title: cartItem.item.title,
+                    subtitle: '${cartItem.item.merchantName} • ${cartItem.quantity} porsi',
+                    price: 'Rp ${(cartItem.totalPrice).toStringAsFixed(0)}',
+                    quantity: cartItem.quantity,
+                    onDecrement: () => onDecrement(cartItem.item.id),
+                    onIncrement: () => onIncrement(cartItem.item.id),
+                  ),
+                ],
+              );
+            }),
         ],
       ),
     );
