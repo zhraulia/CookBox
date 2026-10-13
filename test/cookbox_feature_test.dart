@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nama_project/models/item.dart';
+import 'package:nama_project/models/order_status_args.dart'; // [BARU] import args
 import 'package:nama_project/screens/cart_checkout_screen.dart';
 import 'package:nama_project/screens/detail_menu_screen.dart';
 import 'package:nama_project/screens/merchant_directory_screen.dart';
@@ -103,7 +104,17 @@ void main() {
   testWidgets('status pesanan tampilkan timeline dan form ulasan', (
     tester,
   ) async {
-    await tester.pumpWidget(MaterialApp(home: OrderStatusScreen()));
+    // [BARU] Sediakan args dummy agar OrderStatusScreen bisa diinstansiasi
+    final testArgs = OrderStatusArgs(
+      item: item,
+      quantity: 1,
+      deliveryMode: 'Diantar ke Alamat',
+      totalPrice: 13000,
+      orderCode: 'CB-TEST-001',
+    );
+    await tester.pumpWidget(
+      MaterialApp(home: OrderStatusScreen(args: testArgs)),
+    );
 
     expect(find.text('Disiapkan UMKM'), findsOneWidget);
     expect(find.text('Bahan Segar'), findsOneWidget);
@@ -159,6 +170,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Status Pesanan'), findsOneWidget);
-    expect(find.text('Pesanan berhasil dibuat'), findsOneWidget);
+    // [DIUBAH] Teks yang tampil sekarang menyertakan nama item dari args
+    expect(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Text &&
+            (widget.data?.contains('Pesanan berhasil dibuat') ?? false),
+      ),
+      findsOneWidget,
+    );
   });
 }

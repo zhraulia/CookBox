@@ -1,3 +1,7 @@
-2026/10/06-20:23:35.551 5390 Reusing MANIFEST C:\Users\tlhnf\AppData\Local\Temp\flutter_tools.5684ce28\flutter_tools_chrome_device.7a59fd8c\Default\Site Characteristics Database/MANIFEST-000001
-2026/10/06-20:23:35.551 5390 Recovering log #3
-2026/10/06-20:23:35.552 5390 Reusing old log C:\Users\tlhnf\AppData\Local\Temp\flutter_tools.5684ce28\flutter_tools_chrome_device.7a59fd8c\Default\Site Characteristics Database/000003.log 
+2026/10/13-16:42:55.859 9b2c Reusing MANIFEST C:\Users\acer\AppData\Local\Temp\flutter_tools.e55c6ba0\flutter_tools_chrome_device.e657dbf0\Default\Site Characteristics Database/MANIFEST-000001
+2026/10/13-16:42:55.862 9b2c Recovering log #3
+2026/10/13-16:42:55.862 9b2c Level-0 table #6: started
+2026/10/13-16:42:55.868 9b2c Level-0 table #6: 510 bytes OK
+2026/10/13-16:42:55.869 9b2c Recovering log #6
+2026/10/13-16:42:55.870 9b2c Reusing old log C:\Users\acer\AppData\Local\Temp\flutter_tools.e55c6ba0\flutter_tools_chrome_device.e657dbf0\Default\Site Characteristics Database/000006.log 
+2026/10/13-16:42:55.885 9b2c Delete type=0 #3

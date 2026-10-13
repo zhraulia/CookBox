@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/item.dart';
+import '../models/order_status_args.dart'; // [BARU] import model args
 import '../data/item_repository.dart';
 import '../models/umkm.dart';
 import '../providers/cart_provider.dart';
@@ -92,10 +93,15 @@ class AppRoutes {
           settings: settings,
         );
       case orderStatus:
-        return MaterialPageRoute<void>(
-          builder: (_) => const OrderStatusScreen(),
-          settings: settings,
-        );
+        // [BARU] Periksa tipe argument, teruskan ke OrderStatusScreen
+        final args = settings.arguments;
+        if (args is OrderStatusArgs) {
+          return MaterialPageRoute<void>(
+            builder: (_) => OrderStatusScreen(args: args),
+            settings: settings,
+          );
+        }
+        return null; // argument salah/kosong -> halaman 404
       case support:
         return MaterialPageRoute<void>(
           builder: (_) => const SupportScreen(),
