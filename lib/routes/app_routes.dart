@@ -18,6 +18,7 @@ import '../screens/order_status_screen.dart';
 import '../screens/support_screen.dart';
 import '../screens/umkm_detail_screen.dart';
 import '../screens/umkm_list_screen.dart';
+import '../screens/add_report_screen.dart'; // [TAMBAHAN M5] Import screen tambah laporan
 
 class AppRoutes {
   AppRoutes._();
@@ -34,6 +35,7 @@ class AppRoutes {
   static const String catatanForm = '/catatan-form';
   static const String umkmList = '/umkm-list';
   static const String umkmDetail = '/umkm-detail';
+  static const String addReport = '/add-report'; // [TAMBAHAN M5] Konstanta rute laporan
 
   static Route<dynamic>? onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -128,6 +130,12 @@ class AppRoutes {
           );
         }
         return null;
+      case addReport:
+        // [TAMBAHAN M5] Navigasi ke layar tambah laporan dengan balikan ReportModel
+        return MaterialPageRoute<ReportModel>(
+          builder: (_) => const AddReportScreen(),
+          settings: settings,
+        );
       default:
         return null; // route tidak terdaftar -> halaman 404
     }
